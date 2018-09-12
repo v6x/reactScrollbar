@@ -5,7 +5,8 @@
   "main": "./dist/scrollArea.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "test": "./node_modules/.bin/karma start karma.config.js --single-run --browsers PhantomJS"
+    "test": "./node_modules/.bin/karma start karma.config.js --single-run --browsers PhantomJS",
+    "build": "gulp"
   },
   "repository": {
     "type": "git",

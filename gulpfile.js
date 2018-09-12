@@ -68,8 +68,13 @@ gulp.task('less-examples', function(){
         .pipe(connect.reload());
 });
 
+gulp.task('type', function() {
+    return gulp.src('src/index.d.ts')
+        .pipe(gulp.dest('dist'));
+});
+
 gulp.task('default', function(callback){
-    runSequence('build', 'build-nocss', 'less', ['build-examples', 'less-examples'], callback);
+    runSequence('build', 'build-nocss', 'less', ['build-examples', 'less-examples'], 'type', callback);
 });
 
 gulp.task('production', function(callback){
@@ -87,3 +92,9 @@ gulp.task('watch', function() {
     gulp.watch(['examples/**/js/**/*.js', 'examples/**/*.jsx'], ['build-examples']);
     gulp.watch('examples/**/*.less', ['less-examples']);
 });
+
+gulp.task('type', function() {
+    return gulp.src('src/index.d.ts')
+        .pipe(gulp.dest('dist'));
+});
+
