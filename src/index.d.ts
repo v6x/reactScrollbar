@@ -51,7 +51,32 @@ declare module 'react-scrollbar' {
     cursor: string;
   }
 
-  class ScrollArea extends React.Component<ScrollAreaProps, ScrollAreaStates> {}
+  interface ScrollAreaController {
+    refresh: () => void;
+    scrollTop: () => void;
+    scrollBottom: () => void;
+    scrollYTo: (position: number) => void;
+    scrollLeft: () => void;
+    scrollRight: () => void;
+    scrollXTo: (position: number) => void;
+  }
+
+  class ScrollArea extends React.Component<ScrollAreaProps, ScrollAreaStates> {
+    public scrollArea: ScrollAreaController;
+    public mousePressing: boolean;
+    public touching: boolean;
+
+    public setSizesToState: () => void;
+    public scrollTop: () => void;
+    public scrollBottom: () => void;
+    public scrollYTo: (position: number) => void;
+    public scrollLeft: () => void;
+    public scrollRight: () => void;
+    public scrollXTo: (position: number) => void;
+
+    public preventGrabbing: () => void;
+    public resumeGrabbing: () => void;
+  }
 
   export = ScrollArea;
 }
