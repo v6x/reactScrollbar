@@ -26,7 +26,8 @@ export default class ScrollArea extends React.Component {
             realHeight: 0,
             containerHeight: 0,
             realWidth: 0,
-            containerWidth: 0
+            containerWidth: 0,
+            cursor: "default"
         };
 
         this.scrollArea = {
@@ -60,7 +61,23 @@ export default class ScrollArea extends React.Component {
             deltaY: 0
         };
 
+        this.mousePressing = false;
+        this.mouseDragging = false;
+        this.touchMovingCount = 0;
+        this.multiTouchCount = 0;
+        this.doubleTouch = false;
+        this.touching = false;
+
         this.bindedHandleWindowResize = this.handleWindowResize.bind(this);
+        this.bindedHandleWheel = this.handleWheel.bind(this);
+        this.bindedHandleMouseDown=this.handleMouseDown.bind(this);
+        this.bindedHandleMouseMove=this.handleMouseMove.bind(this);
+        this.bindedHandleMouseUp=this.handleMouseUp.bind(this);
+        this.bindedHandleMouseLeave=this.handleMouseLeave.bind(this);
+        this.bindedHandleTouchStart=this.handleTouchStart.bind(this);
+        this.bindedHandleTouchMove=this.handleTouchMove.bind(this);
+        this.bindedHandleTouchEnd=this.handleTouchEnd.bind(this);
+        this.bindedHandleKeyDown=this.handleKeyDown.bind(this);
     }
 
     getChildContext() {
@@ -75,6 +92,13 @@ export default class ScrollArea extends React.Component {
         }
         this.lineHeightPx = lineHeight(findDOMNode(this.content));
         this.setSizesToState();
+        this.wrapper.addEventListener("mousedown", this.bindedHandleMouseDown)
+        this.wrapper.addEventListener("mousemove", this.bindedHandleMouseMove)
+        this.wrapper.addEventListener("mouseup", this.bindedHandleMouseUp)
+        this.wrapper.addEventListener("mouseleave", this.bindedHandleMouseLeave)
+        this.wrapper.addEventListener("touchstart", this.bindedHandleTouchStart)
+        this.wrapper.addEventListener("touchmove", this.bindedHandleTouchMove)
+        this.wrapper.addEventListener("touchend", this.bindedHandleTouchEnd)
     }
 
     componentWillUnmount() {
@@ -84,6 +108,9 @@ export default class ScrollArea extends React.Component {
     }
 
     componentDidUpdate() {
+        if (this.props.onUpdate) {
+            this.props.onUpdate();
+        }
         this.setSizesToState();
     }
 
@@ -106,6 +133,10 @@ export default class ScrollArea extends React.Component {
                 smoothScrolling={withMotion}
                 minScrollSize={this.props.minScrollSize}
                 onFocus={this.focusContent.bind(this)}
+                containerclassName={this.props.verticalScrollbarContainerClassName}
+                barClassName={this.props.verticalScrollbarClassName}
+                preventGrabbing={this.preventGrabbing}
+                resumeGrabbing={this.resumeGrabbing}
                 type="vertical"/>
         ) : null;
 
@@ -122,6 +153,10 @@ export default class ScrollArea extends React.Component {
                 smoothScrolling={withMotion}
                 minScrollSize={this.props.minScrollSize}
                 onFocus={this.focusContent.bind(this)}
+                containerclassName={this.props.horizontalScrollbarContainerClassName}
+                barClassName={this.props.horizontalScrollbarClassName}
+                preventGrabbing={this.preventGrabbing}
+                resumeGrabbing={this.resumeGrabbing}
                 type="horizontal"/>
         ) : null;
 
@@ -147,18 +182,16 @@ export default class ScrollArea extends React.Component {
                     <div
                         ref={x => this.wrapper = x}
                         className={classes}
-                        style={this.props.style}
-                        onWheel={this.handleWheel.bind(this)}
+                        style={{...this.props.style, cursor:this.state.cursor}}
+                        onWheel={this.bindedHandleWheel}
+                        onKeyDown={this.bindedHandleKeyDown}
+                        tabIndex={this.props.focusableTabIndex}
                     >
+                        {this.props.middleChildren()}
                         <div
                             ref={x => this.content = x}
                             style={{ ...this.props.contentStyle, ...style }}
                             className={contentClasses}
-                            onTouchStart={this.handleTouchStart.bind(this)}
-                            onTouchMove={this.handleTouchMove.bind(this)}
-                            onTouchEnd={this.handleTouchEnd.bind(this)}
-                            onKeyDown={this.handleKeyDown.bind(this)}
-                            tabIndex={this.props.focusableTabIndex}
                         >
                             {children}
                         </div>
@@ -170,14 +203,118 @@ export default class ScrollArea extends React.Component {
         );
     }
 
+    preventGrabbing = () => {
+        this.wrapper.removeEventListener("mousedown", this.bindedHandleMouseDown)
+        this.wrapper.removeEventListener("mousemove", this.bindedHandleMouseMove)
+        this.wrapper.removeEventListener("mouseup", this.bindedHandleMouseUp)
+        this.wrapper.removeEventListener("mouseleave", this.bindedHandleMouseLeave)
+        this.wrapper.removeEventListener("touchstart", this.bindedHandleTouchStart)
+        this.wrapper.removeEventListener("touchmove", this.bindedHandleTouchMove)
+        this.wrapper.removeEventListener("touchend", this.bindedHandleTouchEnd)
+    }
+
+    resumeGrabbing = () => {
+        this.mouseDragging = false;
+        this.mousePressing = false;
+        this.wrapper.addEventListener("mousedown", this.bindedHandleMouseDown)
+        this.wrapper.addEventListener("mousemove", this.bindedHandleMouseMove)
+        this.wrapper.addEventListener("mouseup", this.bindedHandleMouseUp)
+        this.wrapper.addEventListener("mouseleave", this.bindedHandleMouseLeave)
+        this.wrapper.addEventListener("touchstart", this.bindedHandleTouchStart)
+        this.wrapper.addEventListener("touchmove", this.bindedHandleTouchMove)
+        this.wrapper.addEventListener("touchend", this.bindedHandleTouchEnd)
+    }
+
     setStateFromEvent(newState, eventType) {
-        if (this.props.onScroll) {
-            this.props.onScroll(newState);
-        }
         this.setState({...newState, eventType});
+        if (this.props.onScroll) {
+            this.props.onScroll(this.state);
+        }
+    }
+
+    handleMouseDown(e) {
+        if (this.props.onMouseDown) {
+            this.props.onMouseDown();
+        }
+        let {screenX, screenY} = e;
+        this.eventPreviousValues = {
+            ...this.eventPreviousValues,
+            clientY: screenY,
+            clientX: screenX,
+            timestamp: Date.now(),
+            startTime: Date.now()
+        };
+        this.mousePressing = true;
+    }
+
+    handleMouseMove(e) {
+        if (!this.mousePressing) {
+            return;
+        }
+        if (this.canScroll()) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        let {screenX, screenY} = e;
+        let deltaY = this.eventPreviousValues.clientY - screenY;
+        let deltaX = this.eventPreviousValues.clientX - screenX;
+
+        this.eventPreviousValues = {
+            ...this.eventPreviousValues,
+            deltaY,
+            deltaX,
+            clientY: screenY,
+            clientX: screenX,
+            timestamp: Date.now()
+        };
+        this.mouseDragging = true;
+        this.setState({cursor:"-webkit-grabbing"});
+        this.setStateFromEvent(this.composeNewState(-deltaX, -deltaY));
+    }
+
+    handleMouseUp(e) {
+        if (this.mouseDragging == false) {
+            if (this.props.onMouseUp) {
+                this.props.onMouseUp();
+            }
+            this.mousePressing = false;
+            return;
+        }
+        if (this.canScroll()) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        let {deltaX, deltaY, timestamp, startTime} = this.eventPreviousValues;
+        if (typeof deltaX === 'undefined') deltaX = 0;
+        if (typeof deltaY === 'undefined') deltaY = 0;
+        if (Date.now() - timestamp < 200) {
+            this.setStateFromEvent(this.composeNewState(-deltaX * 10, -deltaY * 10), eventTypes.touchEnd);
+        }
+        if (Date.now() - startTime < 200) {
+            this.props.onMouseUp();
+        }
+        this.eventPreviousValues = {
+            ...this.eventPreviousValues,
+            deltaY: 0,
+            deltaX: 0
+        };
+        this.mousePressing = false;
+        this.mouseDragging = false;
+        this.setState({cursor:"default"});
+    }
+
+    handleMouseLeave(e) {
+        this.mousePressing = false;
+        this.mouseDragging = false;
+        this.setState({cursor:"default"});
     }
 
     handleTouchStart(e) {
+        this.touching = true;
+        this.multiTouchCount++;
+        if (this.multiTouchCount >= 2) {
+            this.doubleTouch = true;
+        }
         let {touches} = e;
         if (touches.length === 1) {
             let {clientX, clientY} = touches[0];
@@ -191,13 +328,13 @@ export default class ScrollArea extends React.Component {
     }
 
     handleTouchMove(e) {
-        if (this.canScroll()) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
         let {touches} = e;
         if (touches.length === 1) {
+            if (this.canScroll()) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            this.touchMovingCount++;
             let {clientX, clientY} = touches[0];
 
             let deltaY = this.eventPreviousValues.clientY - clientY;
@@ -217,6 +354,22 @@ export default class ScrollArea extends React.Component {
     }
 
     handleTouchEnd(e) {
+        this.touching = false;
+        if (this.doubleTouch) {
+            this.multiTouchCount--;
+            if (this.multiTouchCount == 0) {
+                this.doubleTouch = false;
+            }
+            return;
+        }
+        if (this.touchMovingCount < 10) {
+            if (this.props.onTouch) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.props.onTouch();
+            }
+        }
+        this.touchMovingCount = 0;
         let {deltaX, deltaY, timestamp} = this.eventPreviousValues;
         if (typeof deltaX === 'undefined') deltaX = 0;
         if (typeof deltaY === 'undefined') deltaY = 0;
@@ -244,6 +397,9 @@ export default class ScrollArea extends React.Component {
     }
 
     handleWheel(e) {
+        if (this.props.preventWheel) {
+            return;
+        }
         let deltaY = e.deltaY;
         let deltaX = e.deltaX;
 
@@ -479,6 +635,16 @@ ScrollArea.propTypes = {
     swapWheelAxes: PropTypes.bool,
     stopScrollPropagation: PropTypes.bool,
     focusableTabIndex: PropTypes.number,
+    onUpdate: PropTypes.func,
+    onMouseUp: PropTypes.func,
+    onMouseDown: PropTypes.func,
+    onTouch: PropTypes.func,
+    preventWheel: PropTypes.bool,
+    verticalScrollbarClassName: PropTypes.string,
+    verticalScrollbarContainerClassName: PropTypes.string,
+    horizontalScrollbarClassName: PropTypes.string,
+    horizontalScrollbarContainerClassName: PropTypes.string,
+    middleChildren: PropTypes.func,
 };
 
 ScrollArea.defaultProps = {
@@ -490,4 +656,6 @@ ScrollArea.defaultProps = {
     contentWindow: (typeof window === "object") ? window : undefined,
     ownerDocument: (typeof document === "object") ? document : undefined,
     focusableTabIndex: 1,
+    preventWheel: false,
+    middleChildren: ()=>{}
 };

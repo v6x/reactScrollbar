@@ -60,25 +60,26 @@ class ScrollBar extends React.Component {
     }
 
     render(){
-        let {smoothScrolling, isDragging, type, scrollbarStyle, containerStyle} = this.props;
+        let {smoothScrolling, isDragging, type, scrollbarStyle, containerStyle, containerclassName, barClassName} = this.props;
         let isVoriziontal = type === 'horizontal';
         let isVertical = type === 'vertical';
         let scrollStyles = this.createScrollStyles();
         let springifiedScrollStyles = smoothScrolling ? modifyObjValues(scrollStyles, x => spring(x)) : scrollStyles;
 
-        let scrollbarClasses = `scrollbar-container ${isDragging ? 'active' : ''} ${isVoriziontal ? 'horizontal' : ''} ${isVertical ? 'vertical' : ''}`;
+        let scrollbarContainerClasses = `scrollbar-container ${isDragging ? 'active' : ''} ${isVoriziontal ? 'horizontal' : ''} ${isVertical ? 'vertical' : ''} ${containerclassName}`;
+        let scrollbarClasses = `scrollbar ${barClassName}`
 
         return (
             <Motion style={springifiedScrollStyles}>
                 { style =>
                     <div
-                        className={scrollbarClasses}
+                        className={scrollbarContainerClasses}
                         style={containerStyle}
                         onMouseDown={this.handleScrollBarContainerClick.bind(this)}
                         ref={ x => this.scrollbarContainer = x }
                     >
                         <div
-                            className="scrollbar"
+                            className={scrollbarClasses}
                             style={{ ...scrollbarStyle, ...style }}
                             onMouseDown={this.handleMouseDown.bind(this)}
                         />
@@ -90,6 +91,7 @@ class ScrollBar extends React.Component {
 
     handleScrollBarContainerClick(e) {
         e.preventDefault();
+        e.stopPropagation();
         let multiplier = this.computeMultiplier();
         let clientPosition = this.isVertical() ? e.clientY : e.clientX;
         let { top, left } = this.scrollbarContainer.getBoundingClientRect();
@@ -107,6 +109,7 @@ class ScrollBar extends React.Component {
 
         if(this.state.isDragging){
             e.preventDefault();
+            e.stopPropagation();
             let deltaX = this.state.lastClientPosition - e.clientX;
             this.setState({ lastClientPosition: e.clientX });
             this.props.onMove(0, deltaX / multiplier);
@@ -118,6 +121,7 @@ class ScrollBar extends React.Component {
 
         if(this.state.isDragging){
             e.preventDefault();
+            e.stopPropagation();
             let deltaY = this.state.lastClientPosition - e.clientY;
             this.setState({ lastClientPosition: e.clientY });
             this.props.onMove(deltaY / multiplier, 0);
@@ -125,6 +129,7 @@ class ScrollBar extends React.Component {
     }
 
     handleMouseDown(e){
+        this.props.preventGrabbing();
         e.preventDefault();
         e.stopPropagation();
         let lastClientPosition = this.isVertical() ? e.clientY: e.clientX;
@@ -135,7 +140,9 @@ class ScrollBar extends React.Component {
 
     handleMouseUp(e){
         if (this.state.isDragging) {
+            this.props.resumeGrabbing();
             e.preventDefault();
+            e.stopPropagation();
             this.setState({isDragging: false });
         }
     }
@@ -175,7 +182,11 @@ ScrollBar.propTypes = {
     type: PropTypes.oneOf(['vertical', 'horizontal']),
     ownerDocument: PropTypes.any,
     smoothScrolling: PropTypes.bool,
-    minScrollSize: PropTypes.number
+    minScrollSize: PropTypes.number,
+    containerclassName : PropTypes.string,
+    barClassName: PropTypes.string,
+    preventGrabbing: PropTypes.func,
+    resumeGrabbing: PropTypes.func,
 };
 
 ScrollBar.defaultProps = {
